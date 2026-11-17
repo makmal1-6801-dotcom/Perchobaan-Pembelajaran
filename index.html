@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Makmal Imbuhan meN- (Tahun 4)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Fredoka & Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- MediaPipe Hands & Camera Utils -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #090d16;
+        }
+        h1, h2, h3, .font-display {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        /* Animasi Portal Berputar & Berdenyut */
+        @keyframes spin-slow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes spin-reverse {
+            0% { transform: rotate(360deg); }
+            100% { transform: rotate(0deg); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); opacity: 0.85; }
+            50% { transform: scale(1.06); opacity: 1; }
+        }
+        @keyframes float-card {
+            0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+            50% { transform: translate(-50%, -50%) translateY(-8px); }
+        }
+        @keyframes pinch-demo {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(0.82) rotate(-8deg); }
+        }
+
+        .portal-ring-outer {
+            animation: spin-slow 12s linear infinite;
+        }
+        .portal-ring-inner {
+            animation: spin-reverse 8s linear infinite;
+        }
+        .portal-core {
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+        .card-idle {
+            animation: float-card 3s ease-in-out infinite;
+        }
+        .pinch-anim {
+            animation: pinch-demo 1.5s ease-in-out infinite;
+        }
+
+        /* Kesan Kaca Makmal (Glassmorphism) */
+        .lab-glass {
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        }
+
+        /* Corak Grid Sains */
+        .science-grid {
+            background-image: 
+                linear-gradient(to right, rgba(56, 189, 248, 0.07) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.07) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Video Webcam Cermin (Mirror) */
+        #webcam-video {
+            transform: scaleX(-1);
+            object-fit: cover;
+        }
+
+        /* Custom Scrollbar untuk Analisis Keputusan */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.5);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative text-white">
+
+    <!-- Latar Belakang Video Webcam Masa Nyata -->
+    <video id="webcam-video" class="fixed inset-0 w-full h-full opacity-45 pointer-events-none z-0" autoplay playsinline muted></video>
+    
+    <!-- Lapisan Latar Belakang Makmal (Fallback jika kamera tiada & Tint Visual) -->
+    <div id="lab-backdrop" class="fixed inset-0 bg-gradient-to-br from-slate-950/85 via-indigo-950/75 to-slate-900/85 science-grid pointer-events-none z-0"></div>
+
+    <!-- Kanvas untuk Zarah Magis, Rangka Tangan & Kesan Magnetik -->
+    <canvas id="fx-canvas" class="fixed inset-0 w-full h-full pointer-events-none z-30"></canvas>
+
+    <!-- KONTENA UTAMA PERMAINAN -->
+    <div id="game-container" class="relative w-full h-full z-10 flex flex-col justify-between p-3 sm:p-5">
+
+        <!-- BAR ATAS (HUD: Skor, Kombo, Masa, Status Kamera) -->
+        <header id="hud-bar" class="hidden w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 lab-glass rounded-2xl px-4 py-2.5 sm:px-6 sm:py-3">
+            <!-- Kiri: Tajuk & Status Pengesan -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                    <i class="fa-solid fa-flask-vial text-lg text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-display text-base sm:text-lg font-bold tracking-wide text-cyan-300 leading-tight">MAKMAL meN-</h1>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-300">
+                        <span id="cam-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span id="cam-status-text">Menyambung Kamera...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tengah: Masa Undur 90 Saat -->
+            <div class="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-4 py-1.5 rounded-xl shadow-inner">
+                <i class="fa-regular fa-clock text-cyan-400"></i>
+                <span id="timer-display" class="font-display text-xl sm:text-2xl font-bold text-white tabular-nums">01:30</span>
+            </div>
+
+            <!-- Kanan: Skor, Kombo & Butang Audio -->
+            <div class="flex items-center gap-3 sm:gap-5">
+                <!-- Kombo Badge -->
+                <div id="combo-badge" class="hidden items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-1 rounded-full text-xs sm:text-sm font-extrabold shadow-lg shadow-orange-500/30 transform transition-transform">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span id="combo-text">KOMBO x2</span>
+                </div>
+
+                <!-- Skor -->
+                <div class="text-right">
+                    <div class="text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 font-bold">Markah</div>
+                    <div id="score-display" class="font-display text-xl sm:text-2xl font-bold text-emerald-400 tabular-nums">0</div>
+                </div>
+
+                <!-- Butang Bunyi -->
+                <button id="btn-mute" onclick="toggleMute()" class="w-10 h-10 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-600/60 flex items-center justify-center text-cyan-300 transition active:scale-95" title="Tutup/Buka Bunyi">
+                    <i id="mute-icon" class="fa-solid fa-volume-high"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- ZON PERMAINAN (4 Portal di Penjuru/Sisi & Kad Perkataan di Tengah) -->
+        <main id="play-zone" class="hidden relative flex-1 w-full max-w-6xl mx-auto my-2">
+            
+            <!-- 4 PORTAL IMBUHAN -->
+            <!-- Portal 1: mem- (Kiri Atas) -->
+            <div id="portal-mem" data-prefix="mem-" class="portal-zone absolute top-2 left-2 sm:top-4 sm:left-6 w-28 h-28 sm:w-40 sm:h-40 rounded-full flex flex-col items-center justify-center transition-transform duration-200">
+                <div class="portal-ring-outer absolute inset-0 rounded-full border-4 border-dashed border-cyan-400/70 shadow-[0_0_25px_rgba(34,211,238,0.4)]"></div>
+                <div class="portal-ring-inner absolute inset-2 rounded-full border-2 border-cyan-300/50"></div>
+                <div class="portal-core w-22 h-22 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-cyan-500/80 to-blue-700/90 flex flex-col items-center justify-center shadow-inner border border-cyan-200/40">
+                    <span class="font-display text-2xl sm:text-4xl font-extrabold text-white drop-shadow">mem-</span>
+                    <span class="text-[10px] sm:text-xs text-cyan-100 font-semibold mt-0.5">b, f, p, v</span>
+                </div>
+            </div>
+
+            <!-- Portal 2: men- (Kanan Atas) -->
+            <div id="portal-men" data-prefix="men-" class="portal-zone absolute top-2 right-2 sm:top-4 sm:right-6 w-28 h-28 sm:w-40 sm:h-40 rounded-full flex flex-col items-center justify-center transition-transform duration-200">
+                <div class="portal-ring-outer absolute inset-0 rounded-full border-4 border-dashed border-emerald-400/70 shadow-[0_0_25px_rgba(52,211,153,0.4)]"></div>
+                <div class="portal-ring-inner absolute inset-2 rounded-full border-2 border-emerald-300/50"></div>
+                <div class="portal-core w-22 h-22 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-emerald-500/80 to-teal-700/90 flex flex-col items-center justify-center shadow-inner border border-emerald-200/40">
+                    <span class="font-display text-2xl sm:text-4xl font-extrabold text-white drop-shadow">men-</span>
+                    <span class="text-[10px] sm:text-xs text-emerald-100 font-semibold mt-0.5">c, d, j, sy, t, z</span>
+                </div>
+            </div>
+
+            <!-- Portal 3: meng- (Kiri Bawah) -->
+            <div id="portal-meng" data-prefix="meng-" class="portal-zone absolute bottom-2 left-2 sm:bottom-4 sm:left-6 w-28 h-28 sm:w-40 sm:h-40 rounded-full flex flex-col items-center justify-center transition-transform duration-200">
+                <div class="portal-ring-outer absolute inset-0 rounded-full border-4 border-dashed border-purple-400/70 shadow-[0_0_25px_rgba(192,132,252,0.4)]"></div>
+                <div class="portal-ring-inner absolute inset-2 rounded-full border-2 border-purple-300/50"></div>
+                <div class="portal-core w-22 h-22 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-purple-500/80 to-indigo-700/90 flex flex-col items-center justify-center shadow-inner border border-purple-200/40">
+                    <span class="font-display text-2xl sm:text-4xl font-extrabold text-white drop-shadow">meng-</span>
+                    <span class="text-[10px] sm:text-xs text-purple-100 font-semibold mt-0.5">a,e,i,o,u,g,h,k</span>
+                </div>
+            </div>
+
+            <!-- Portal 4: menge- (Kanan Bawah) -->
+            <div id="portal-menge" data-prefix="menge-" class="portal-zone absolute bottom-2 right-2 sm:bottom-4 sm:right-6 w-28 h-28 sm:w-40 sm:h-40 rounded-full flex flex-col items-center justify-center transition-transform duration-200">
+                <div class="portal-ring-outer absolute inset-0 rounded-full border-4 border-dashed border-amber-400/70 shadow-[0_0_25px_rgba(251,191,36,0.4)]"></div>
+                <div class="portal-ring-inner absolute inset-2 rounded-full border-2 border-amber-300/50"></div>
+                <div class="portal-core w-22 h-22 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-amber-500/80 to-orange-700/90 flex flex-col items-center justify-center shadow-inner border border-amber-200/40">
+                    <span class="font-display text-2xl sm:text-4xl font-extrabold text-white drop-shadow">menge-</span>
+                    <span class="text-[10px] sm:text-xs text-amber-100 font-semibold mt-0.5">1 suku kata</span>
+                </div>
+            </div>
+
+            <!-- KAD PERKATAAN DASAR (Boleh Dicubit & Diseret) -->
+            <div id="word-card" class="card-idle absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 cursor-grab active:cursor-grabbing">
+                <div id="card-inner" class="relative px-7 py-5 sm:px-10 sm:py-7 rounded-3xl bg-gradient-to-b from-slate-800 to-slate-900 border-2 border-cyan-400/80 shadow-[0_12px_35px_rgba(6,182,212,0.45)] flex flex-col items-center justify-center min-w-[170px] sm:min-w-[230px] transition-colors duration-150">
+                    <!-- Penunjuk Ikon Cubit -->
+                    <div id="card-hint-badge" class="absolute -top-3.5 bg-cyan-500 text-slate-950 text-[11px] sm:text-xs font-extrabold px-3 py-0.5 rounded-full shadow flex items-center gap-1">
+                        <i class="fa-solid fa-hand-pinch"></i>
+                        <span>CUBIT & SERET</span>
+                    </div>
+                    
+                    <!-- Emoji Konteks Perkataan -->
+                    <div id="word-emoji" class="text-3xl sm:text-4xl mb-1 drop-shadow">🧪</div>
+                    
+                    <!-- Teks Kata Dasar -->
+                    <div id="word-text" class="font-display text-3xl sm:text-5xl font-extrabold tracking-wide text-white">
+                        sapu
+                    </div>
+                    
+                    <!-- Kategori / Pembayang Ringkas -->
+                    <div id="word-clue" class="text-xs text-cyan-300/90 font-medium mt-1.5 bg-slate-950/60 px-3 py-0.5 rounded-full">
+                        Kata Dasar
+                    </div>
+                </div>
+            </div>
+
+            <!-- MESEJ MAKLUM BALAS SEGERA (Toast Terapung) -->
+            <div id="feedback-toast" class="pointer-events-none absolute left-1/2 top-16 sm:top-12 -translate-x-1/2 z-40 opacity-0 transition-all duration-300 transform scale-90">
+                <div id="feedback-box" class="px-6 py-3 rounded-2xl font-display text-lg sm:text-2xl font-bold shadow-2xl border-2 flex items-center gap-2.5 whitespace-nowrap">
+                    <i id="feedback-icon" class="fa-solid fa-circle-check"></i>
+                    <span id="feedback-msg">Tepat! menyapu</span>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- BAR BAWAH: Panduan Kawalan Pantas -->
+        <footer id="footer-bar" class="hidden w-full max-w-3xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 bg-slate-900/80 border border-slate-700/70 px-4 py-1.5 rounded-full text-xs sm:text-sm text-slate-300">
+                <i class="fa-solid fa-hand-sparkles text-cyan-400"></i>
+                <span>Rapatkan <strong>ibu jari & jari telunjuk</strong> pada kad untuk mencubit, atau gunakan tetikus/sentuhan skrin.</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SKRIN 1: MENU MULA & PANDUAN ISYARAT MENCUBIT              -->
+    <!-- ========================================================= -->
+    <div id="start-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="lab-glass max-w-2xl w-full rounded-3xl p-6 sm:p-8 border-2 border-cyan-400/40 shadow-2xl text-center relative overflow-hidden">
+            
+            <!-- Lencana Tahun 4 -->
+            <div class="inline-flex items-center gap-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 px-4 py-1 rounded-full text-xs sm:text-sm font-bold mb-3">
+                <i class="fa-solid fa-atom fa-spin"></i>
+                <span>BAHASA MELAYU TAHUN 4 • TATABAHASA</span>
+            </div>
+
+            <h1 class="font-display text-3xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-emerald-300 mb-2">
+                Makmal Imbuhan meN-
+            </h1>
+            <p class="text-slate-300 text-sm sm:text-base max-w-lg mx-auto mb-6">
+                Uji kepantasan minda dan tangan anda! Padankan kata dasar ke dalam portal imbuhan awalan yang tepat dalam masa <strong>90 saat</strong>.
+            </p>
+
+            <!-- Panduan Visual Isyarat Mencubit (Pinch) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 text-left">
+                <!-- Langkah 1 -->
+                <div class="bg-slate-900/85 border border-slate-700/80 rounded-2xl p-4 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 text-2xl mb-2.5">
+                        <i class="fa-solid fa-hand"></i>
+                    </div>
+                    <h3 class="font-display font-bold text-white text-sm sm:text-base mb-1">1. Halakan Tangan</h3>
+                    <p class="text-xs text-slate-400">Gerakkan penunjuk cahaya pada skrin tepat ke atas kad kata dasar.</p>
+                </div>
+
+                <!-- Langkah 2 -->
+                <div class="bg-slate-900/85 border border-cyan-500/50 rounded-2xl p-4 flex flex-col items-center text-center shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 text-2xl mb-2.5 pinch-anim">
+                        <i class="fa-solid fa-hand-lizard"></i>
+                    </div>
+                    <h3 class="font-display font-bold text-amber-300 text-sm sm:text-base mb-1">2. Isyarat Mencubit</h3>
+                    <p class="text-xs text-slate-300">Temukan hujung <strong>ibu jari & jari telunjuk</strong> untuk memegang kad.</p>
+                </div>
+
+                <!-- Langkah 3 -->
+                <div class="bg-slate-900/85 border border-slate-700/80 rounded-2xl p-4 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 text-2xl mb-2.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    <h3 class="font-display font-bold text-white text-sm sm:text-base mb-1">3. Seret ke Portal</h3>
+                    <p class="text-xs text-slate-400">Tarik kad ke portal <strong>mem-, men-, meng-</strong> atau <strong>menge-</strong> yang betul!</p>
+                </div>
+            </div>
+
+            <!-- Nota Hukum Luluh Ringkas -->
+            <div class="bg-indigo-950/60 border border-indigo-400/30 rounded-2xl p-3 mb-6 text-xs sm:text-sm text-indigo-200 flex items-center justify-center gap-2.5">
+                <i class="fa-solid fa-lightbulb text-amber-400 text-base"></i>
+                <span>Ingat! Huruf <strong>k, p, s, t</strong> akan luluh apabila bertemu imbuhan (contoh: <em>sapu &rarr; menyapu</em>).</span>
+            </div>
+
+            <!-- Butang Mula & Status Pemuatan Model -->
+            <div class="flex flex-col items-center gap-3">
+                <button id="btn-start-game" onclick="startGame()" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-display text-xl font-bold shadow-lg shadow-cyan-500/30 transform transition hover:scale-105 active:scale-95 flex items-center justify-center gap-3 cursor-pointer">
+                    <i class="fa-solid fa-play"></i>
+                    <span>MULA EKSPERIMEN</span>
+                </button>
+                <p id="start-cam-note" class="text-xs text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-camera text-cyan-400"></i>
+                    <span>Sila benarkan akses kamera untuk kawalan tangan (Tetikus/Sentuhan juga disokong).</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SKRIN 2: KEPUTUSAN & ANALISIS KESALAHAN EJAAN             -->
+    <!-- ========================================================= -->
+    <div id="result-screen" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md">
+        <div class="lab-glass max-w-3xl w-full max-h-[92vh] flex flex-col rounded-3xl p-5 sm:p-7 border-2 border-cyan-400/40 shadow-2xl">
+            
+            <!-- Kepala Keputusan -->
+            <div class="text-center mb-4">
+                <div id="result-badge" class="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 px-4 py-1 rounded-full text-xs sm:text-sm font-bold mb-2">
+                    <i class="fa-solid fa-trophy"></i>
+                    <span>EKSPERIMEN SELESAI!</span>
+                </div>
+                <h2 class="font-display text-2xl sm:text-4xl font-extrabold text-white">Laporan Makmal Imbuhan</h2>
+            </div>
+
+            <!-- Statistik Ringkas -->
+            <div class="grid grid-cols-3 gap-2.5 sm:gap-4 mb-5">
+                <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 text-center">
+                    <div class="text-xs text-slate-400 font-semibold">Jumlah Skor</div>
+                    <div id="final-score" class="font-display text-2xl sm:text-3xl font-extrabold text-cyan-400">0</div>
+                </div>
+                <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 text-center">
+                    <div class="text-xs text-slate-400 font-semibold">Jawapan Tepat</div>
+                    <div id="final-correct" class="font-display text-2xl sm:text-3xl font-extrabold text-emerald-400">0</div>
+                </div>
+                <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 text-center">
+                    <div class="text-xs text-slate-400 font-semibold">Kombo Tertinggi</div>
+                    <div id="final-combo" class="font-display text-2xl sm:text-3xl font-extrabold text-amber-400">0x</div>
+                </div>
+            </div>
+
+            <!-- Bahagian Analisis Kesalahan Ejaan & Tatabahasa -->
+            <div class="flex-1 overflow-hidden flex flex-col bg-slate-900/75 border border-slate-700/80 rounded-2xl p-4 mb-5">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-700/80">
+                    <h3 class="font-display text-base sm:text-lg font-bold text-cyan-300 flex items-center gap-2">
+                        <i class="fa-solid fa-microscope"></i>
+                        <span>Analisis Jawapan & Hukum Ejaan</span>
+                    </h3>
+                    <span id="mistake-count-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        0 Kesalahan
+                    </span>
+                </div>
+
+                <!-- Senarai Analisis Boleh Skrol -->
+                <div id="analysis-list" class="overflow-y-auto space-y-2.5 pr-1 flex-1 text-left">
+                    <!-- Item analisis akan dijana melalui JavaScript -->
+                </div>
+            </div>
+
+            <!-- Butang Main Semula -->
+            <div class="flex justify-center">
+                <button onclick="resetAndStart()" class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-display text-lg sm:text-xl font-bold shadow-lg shadow-emerald-500/30 transform transition hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5 cursor-pointer">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>CUBA LAGI</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * PANGKALAN DATA KATA DASAR TAHUN 4 (IMBUHAN AWALAN meN-)
+         * Merangkumi hukum pengguguran huruf (k, p, s, t), pengekalan huruf,
+         * dan kata dasar satu suku kata (menge-).
+         * ============================================================================
+         */
+        const WORD_BANK = [
+            // Portal: mem- (b, f, p [luluh], v)
+            { base: "baca", prefix: "mem-", result: "membaca", emoji: "📖", rule: "Huruf 'b' dikekalkan apabila bertemu awalan mem-." },
+            { base: "basuh", prefix: "mem-", result: "membasuh", emoji: "🧼", rule: "Huruf 'b' dikekalkan: mem- + basuh = membasuh." },
+            { base: "beli", prefix: "mem-", result: "membeli", emoji: "🛒", rule: "Huruf 'b' dikekalkan: mem- + beli = membeli." },
+            { base: "bantu", prefix: "mem-", result: "membantu", emoji: "🤝", rule: "Huruf 'b' dikekalkan: mem- + bantu = membantu." },
+            { base: "potong", prefix: "mem-", result: "memotong", emoji: "✂️", rule: "Hukum Luluh: Huruf 'p' digugurkan menjadi 'memotong'." },
+            { base: "pukul", prefix: "mem-", result: "memukul", emoji: "🥁", rule: "Hukum Luluh: Huruf 'p' digugurkan menjadi 'memukul'." },
+            { base: "pilih", prefix: "mem-", result: "memilih", emoji: "✅", rule: "Hukum Luluh: Huruf 'p' digugurkan menjadi 'memilih'." },
+            { base: "panjat", prefix: "mem-", result: "memanjat", emoji: "🧗", rule: "Hukum Luluh: Huruf 'p' digugurkan menjadi 'memanjat'." },
+            { base: "faham", prefix: "mem-", result: "memahami", emoji: "💡", rule: "Huruf 'f' dikekalkan (atau luluh dalam beberapa terbitan)." },
+
+            // Portal: men- (c, d, j, sy, t [luluh], z, s [luluh -> meny, tetapi dipadankan ke men- dalam sistem 4 portal])
+            // Nota Pedagogi: Dalam silibus Tahun 4, 4 portal utama ialah mem-, men-, meng-, menge-.
+            // Perkataan bermula 's' (meny-) dikecualikan daripada 4 portal ini supaya murid tidak keliru dengan ejaan 'meny-',
+            // sebaliknya kita fokus kepada huruf c, d, j, t (luluh), dan z untuk portal men-!
+            { base: "cuci", prefix: "men-", result: "mencuci", emoji: "🧽", rule: "Huruf 'c' dikekalkan: men- + cuci = mencuci." },
+            { base: "cari", prefix: "men-", result: "mencari", emoji: "🔍", rule: "Huruf 'c' dikekalkan: men- + cari = mencari." },
+            { base: "dengar", prefix: "men-", result: "mendengar", emoji: "👂", rule: "Huruf 'd' dikekalkan: men- + dengar = mendengar." },
+            { base: "dorong", prefix: "men-", result: "mendorong", emoji: "🚀", rule: "Huruf 'd' dikekalkan: men- + dorong = mendorong." },
+            { base: "jahit", prefix: "men-", result: "menjahit", emoji: "🪡", rule: "Huruf 'j' dikekalkan: men- + jahit = menjahit." },
+            { base: "jemput", prefix: "men-", result: "menjemput", emoji: "💌", rule: "Huruf 'j' dikekalkan: men- + jemput = menjemput." },
+            { base: "tulis", prefix: "men-", result: "menulis", emoji: "✍️", rule: "Hukum Luluh: Huruf 't' digugurkan menjadi 'menulis'." },
+            { base: "tolak", prefix: "men-", result: "menolak", emoji: "👐", rule: "Hukum Luluh: Huruf 't' digugurkan menjadi 'menolak'." },
+            { base: "tanam", prefix: "men-", result: "menanam", emoji: "🌱", rule: "Hukum Luluh: Huruf 't' digugurkan menjadi 'menanam'." },
+            { base: "ziarah", prefix: "men-", result: "menziarahi", emoji: "🕌", rule: "Huruf 'z' dikekalkan: men- + ziarah = menziarahi." },
+
+            // Portal: meng- (vokal a, e, i, o, u, g, h, kh, k [luluh])
+            { base: "ambil", prefix: "meng-", result: "mengambil", emoji: "🤲", rule: "Kata dasar bermula vokal 'a' menggunakan awalan meng-." },
+            { base: "ajar", prefix: "meng-", result: "mengajar", emoji: "👩‍🏫", rule: "Kata dasar bermula vokal 'a' menggunakan awalan meng-." },
+            { base: "ikat", prefix: "meng-", result: "mengikat", emoji: "🪢", rule: "Kata dasar bermula vokal 'i' menggunakan awalan meng-." },
+            { base: "ubat", prefix: "meng-", result: "mengubat", emoji: "💊", rule: "Kata dasar bermula vokal 'u' menggunakan awalan meng-." },
+            { base: "gosok", prefix: "meng-", result: "menggosok", emoji: "🪥", rule: "Huruf 'g' dikekalkan (gandaan 'gg'): meng- + gosok = menggosok." },
+            { base: "gali", prefix: "meng-", result: "menggali", emoji: "⛏️", rule: "Huruf 'g' dikekalkan: meng- + gali = menggali." },
+            { base: "hantar", prefix: "meng-", result: "menghantar", emoji: "📦", rule: "Huruf 'h' dikekalkan: meng- + hantar = menghantar." },
+            { base: "kutip", prefix: "meng-", result: "mengutip", emoji: "🗑️", rule: "Hukum Luluh: Huruf 'k' digugurkan menjadi 'mengutip'." },
+            { base: "kawal", prefix: "meng-", result: "mengawal", emoji: "🛡️", rule: "Hukum Luluh: Huruf 'k' digugurkan menjadi 'mengawal'." },
+            { base: "karang", prefix: "meng-", result: "mengarang", emoji: "📝", rule: "Hukum Luluh: Huruf 'k' digugurkan menjadi 'mengarang'." },
+
+            // Portal: menge- (kata dasar satu suku kata)
+            { base: "cat", prefix: "menge-", result: "mengecat", emoji: "🎨", rule: "Kata dasar 1 suku kata ('cat') wajib menggunakan awalan menge-." },
+            { base: "lap", prefix: "menge-", result: "mengelap", emoji: "🧻", rule: "Kata dasar 1 suku kata ('lap') wajib menggunakan awalan menge-." },
+            { base: "pam", prefix: "menge-", result: "mengepam", emoji: "🚲", rule: "Kata dasar 1 suku kata ('pam') wajib menggunakan awalan menge-." },
+            { base: "bom", prefix: "menge-", result: "mengebom", emoji: "💥", rule: "Kata dasar 1 suku kata ('bom') wajib menggunakan awalan menge-." },
+            { base: "pos", prefix: "menge-", result: "mengepos", emoji: "📮", rule: "Kata dasar 1 suku kata ('pos') wajib menggunakan awalan menge-." },
+            { base: "cap", prefix: "menge-", result: "mengecap", emoji: "💮", rule: "Kata dasar 1 suku kata ('cap') wajib menggunakan awalan menge-." },
+            { base: "sah", prefix: "menge-", result: "mengesahkan", emoji: "🔏", rule: "Kata dasar 1 suku kata ('sah') wajib menggunakan awalan menge-." },
+            { base: "had", prefix: "menge-", result: "mengehadkan", emoji: "🚧", rule: "Kata dasar 1 suku kata ('had') wajib menggunakan awalan menge-." }
+        ];
+
+        /**
+         * ============================================================================
+         * PEMBOLEH UBAH KEADAAN PERMAINAN (GAME STATE)
+         * ============================================================================
+         */
+        let gameState = {
+            isPlaying: false,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            correctCount: 0,
+            timeLeft: 90,
+            timerInterval: null,
+            currentWord: null,
+            wordPool: [],
+            history: [], // Menyimpan rekod jawapan (betul & salah) untuk analisis akhir
+            isMuted: false,
+            cardPos: { x: 0, y: 0 },
+            isDragging: false,
+            dragSource: null, // 'hand' atau 'pointer'
+            magnetTarget: null // Portal yang sedang menarik kad secara magnetik
+        };
+
+        // Keadaan Penjejakan Tangan MediaPipe
+        let handState = {
+            detected: false,
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+            smoothX: window.innerWidth / 2,
+            smoothY: window.innerHeight / 2,
+            isPinching: false,
+            pinchStrength: 0, // 0 hingga 1
+            landmarks: null
+        };
+
+        // Rujukan Elemen DOM
+        const videoEl = document.getElementById('webcam-video');
+        const canvasEl = document.getElementById('fx-canvas');
+        const ctx = canvasEl.getContext('2d');
+        const wordCardEl = document.getElementById('word-card');
+        const cardInnerEl = document.getElementById('card-inner');
+        const playZoneEl = document.getElementById('play-zone');
+
+        // Sistem Zarah Magis (Particles)
+        let particles = [];
+        let magneticLines = [];
+
+        /**
+         * ============================================================================
+         * SISTEM AUDIO SINTETIK (WEB AUDIO API - TIADA FAIL LUAR DIPERLUKAN)
+         * ============================================================================
+         */
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(freq, type, duration, vol = 0.2, delay = 0) {
+                if (gameState.isMuted) return;
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
+                    
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + delay + duration);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start(this.ctx.currentTime + delay);
+                    osc.stop(this.ctx.currentTime + delay + duration);
+                } catch (e) {
+                    // Abaikan jika browser menyekat audio sebelum interaksi
+                }
+            },
+            playPinch() {
+                this.playTone(520, 'sine', 0.12, 0.15);
+                this.playTone(780, 'sine', 0.1, 0.1, 0.04);
+            },
+            playMagnet() {
+                this.playTone(340, 'triangle', 0.08, 0.06);
+            },
+            playSuccess(combo) {
+                const base = 523.25 + Math.min(combo * 30, 240); // C5 naik mengikut kombo
+                this.playTone(base, 'sine', 0.18, 0.22, 0);
+                this.playTone(base * 1.25, 'sine', 0.18, 0.22, 0.08);
+                this.playTone(base * 1.5, 'triangle', 0.35, 0.25, 0.16);
+            },
+            playError() {
+                this.playTone(220, 'sawtooth', 0.2, 0.18, 0);
+                this.playTone(175, 'sawtooth', 0.3, 0.18, 0.12);
+            },
+            playGameOver() {
+                this.playTone(587.33, 'triangle', 0.2, 0.2, 0);
+                this.playTone(523.25, 'triangle', 0.2, 0.2, 0.15);
+                this.playTone(440.00, 'triangle', 0.2, 0.2, 0.3);
+                this.playTone(392.00, 'triangle', 0.5, 0.25, 0.45);
+            }
+        };
+
+        function toggleMute() {
+            gameState.isMuted = !gameState.isMuted;
+            const icon = document.getElementById('mute-icon');
+            icon.className = gameState.isMuted ? 'fa-solid fa-volume-xmark text-rose-400' : 'fa-solid fa-volume-high';
+        }
+
+        /**
+         * ============================================================================
+         * PENYEDIAAN KANVAS & ZARAH MAGIS
+         * ============================================================================
+         */
+        function resizeCanvas() {
+            canvasEl.width = window.innerWidth;
+            canvasEl.height = window.innerHeight;
+            if (!gameState.isDragging && gameState.isPlaying) {
+                centerWordCard();
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function spawnParticles(x, y, color, count = 25, speedScale = 1) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (Math.random() * 5 + 2) * speedScale;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 6 + 3,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.025 + 0.015,
+                    shape: Math.random() > 0.5 ? 'circle' : 'star'
+                });
+            }
+        }
+
+        function drawStar(cx, cy, spikes, outerRadius, innerRadius, color, alpha) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / spikes;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.lineTo(cx, cy - outerRadius);
+            ctx.closePath();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        /**
+         * ============================================================================
+         * LOGIK KEDUDUKAN KAD, KESAN MAGNETIK & PENGESANAN PORTAL
+         * ============================================================================
+         */
+        function centerWordCard() {
+            const rect = playZoneEl.getBoundingClientRect();
+            gameState.cardPos.x = rect.width / 2;
+            gameState.cardPos.y = rect.height / 2;
+            updateCardDOMPosition();
+        }
+
+        function updateCardDOMPosition() {
+            wordCardEl.style.left = `${gameState.cardPos.x}px`;
+            wordCardEl.style.top = `${gameState.cardPos.y}px`;
+        }
+
+        function getPortalCenters() {
+            const portals = document.querySelectorAll('.portal-zone');
+            const zoneRect = playZoneEl.getBoundingClientRect();
+            const list = [];
+
+            portals.forEach(p => {
+                const r = p.getBoundingClientRect();
+                list.push({
+                    el: p,
+                    prefix: p.dataset.prefix,
+                    // Koordinat relatif kepada playZone
+                    x: (r.left - zoneRect.left) + r.width / 2,
+                    y: (r.top - zoneRect.top) + r.height / 2,
+                    // Koordinat skrin penuh (viewport) untuk kanvas
+                    screenX: r.left + r.width / 2,
+                    screenY: r.top + r.height / 2,
+                    radius: r.width / 2
+                });
+            });
+            return list;
+        }
+
+        function processCardMovement(targetZoneX, targetZoneY) {
+            const portals = getPortalCenters();
+            let nearestCorrectPortal = null;
+            let hoveredPortal = null;
+            const magnetRadius = window.innerWidth < 640 ? 135 : 195;
+            const dropRadius = window.innerWidth < 640 ? 75 : 105;
+
+            // Semak jarak ke setiap portal
+            portals.forEach(p => {
+                const dx = p.x - targetZoneX;
+                const dy = p.y - targetZoneY;
+                const dist = Math.hypot(dx, dy);
+
+                // Reset skala visual portal
+                p.el.style.transform = 'scale(1)';
+
+                if (dist < magnetRadius) {
+                    // Kesan Magnetik: Jika portal ini adalah jawapan yang BETUL
+                    if (gameState.currentWord && p.prefix === gameState.currentWord.prefix) {
+                        nearestCorrectPortal = { portal: p, dist: dist };
+                    }
+                    // Sorotan visual jika menghampiri mana-mana portal
+                    if (dist < dropRadius * 1.15) {
+                        hoveredPortal = p;
+                        p.el.style.transform = 'scale(1.12)';
+                    }
+                }
+            });
+
+            // Terapkan Tarikan Magnetik jika menghampiri portal yang betul
+            if (nearestCorrectPortal) {
+                const { portal, dist } = nearestCorrectPortal;
+                const pullFactor = Math.max(0.18, 1 - (dist / magnetRadius)) * 0.45;
+                targetZoneX += (portal.x - targetZoneX) * pullFactor;
+                targetZoneY += (portal.y - targetZoneY) * pullFactor;
+
+                if (gameState.magnetTarget !== portal.prefix) {
+                    gameState.magnetTarget = portal.prefix;
+                    AudioEngine.playMagnet();
+                }
+
+                // Visual kad bersinar hijau/emas apabila ditarik magnet
+                cardInnerEl.classList.remove('border-cyan-400/80');
+                cardInnerEl.classList.add('border-emerald-400', 'shadow-[0_0_40px_rgba(52,211,153,0.75)]');
+            } else {
+                gameState.magnetTarget = null;
+                cardInnerEl.classList.add('border-cyan-400/80');
+                cardInnerEl.classList.remove('border-emerald-400', 'shadow-[0_0_40px_rgba(52,211,153,0.75)]');
+            }
+
+            // Hadkan kad supaya kekal di dalam zon permainan
+            const zoneRect = playZoneEl.getBoundingClientRect();
+            gameState.cardPos.x = Math.max(60, Math.min(zoneRect.width - 60, targetZoneX));
+            gameState.cardPos.y = Math.max(50, Math.min(zoneRect.height - 50, targetZoneY));
+            updateCardDOMPosition();
+
+            // Jika kad masuk terus ke dalam zon teras portal, sahkan jawapan serta-merta!
+            if (hoveredPortal) {
+                const distToCore = Math.hypot(hoveredPortal.x - gameState.cardPos.x, hoveredPortal.y - gameState.cardPos.y);
+                if (distToCore < dropRadius * 0.72) {
+                    evaluateDrop(hoveredPortal);
+                }
+            }
+        }
+
+        function releaseCard() {
+            if (!gameState.isDragging) return;
+            gameState.isDragging = false;
+            gameState.dragSource = null;
+            gameState.magnetTarget = null;
+
+            wordCardEl.classList.add('card-idle');
+            cardInnerEl.classList.remove('scale-110', 'border-emerald-400', 'shadow-[0_0_40px_rgba(52,211,153,0.75)]');
+            cardInnerEl.classList.add('border-cyan-400/80');
+
+            // Semak jika dilepaskan berhampiran mana-mana portal
+            const portals = getPortalCenters();
+            const dropRadius = window.innerWidth < 640 ? 90 : 120;
+            let matchedPortal = null;
+
+            portals.forEach(p => {
+                p.el.style.transform = 'scale(1)';
+                const dist = Math.hypot(p.x - gameState.cardPos.x, p.y - gameState.cardPos.y);
+                if (dist < dropRadius) {
+                    matchedPortal = p;
+                }
+            });
+
+            if (matchedPortal) {
+                evaluateDrop(matchedPortal);
+            } else {
+                // Kembalikan kad ke tengah jika dilepaskan di kawasan kosong
+                centerWordCard();
+            }
+        }
+
+        /**
+         * ============================================================================
+         * PENILAIAN JAWAPAN, SKOR, KOMBO & MAKLUM BALAS SEGERA
+         * ============================================================================
+         */
+        function evaluateDrop(portal) {
+            if (!gameState.isPlaying || !gameState.currentWord) return;
+
+            // Hentikan seretan semasa memproses jawapan
+            gameState.isDragging = false;
+            gameState.dragSource = null;
+            gameState.magnetTarget = null;
+            wordCardEl.classList.add('card-idle');
+            portal.el.style.transform = 'scale(1)';
+
+            const word = gameState.currentWord;
+            const isCorrect = (portal.prefix === word.prefix);
+
+            // Rekod dalam sejarah untuk Analisis Keputusan
+            gameState.history.push({
+                base: word.base,
+                selectedPrefix: portal.prefix,
+                correctPrefix: word.prefix,
+                correctResult: word.result,
+                rule: word.rule,
+                isCorrect: isCorrect
+            });
+
+            if (isCorrect) {
+                // JAWAPAN TEPAT!
+                gameState.combo++;
+                if (gameState.combo > gameState.maxCombo) {
+                    gameState.maxCombo = gameState.combo;
+                }
+                gameState.correctCount++;
+
+                const bonus = (gameState.combo - 1) * 20;
+                const earned = 100 + bonus;
+                gameState.score += earned;
+
+                AudioEngine.playSuccess(gameState.combo);
+                spawnParticles(portal.screenX, portal.screenY, '#34d399', 38, 1.3);
+                spawnParticles(portal.screenX, portal.screenY, '#fde047', 20, 1.1);
+
+                showFeedback(true, `Tepat! ${word.result} (+${earned})`);
+            } else {
+                // JAWAPAN KURANG TEPAT
+                gameState.combo = 0;
+                gameState.score = Math.max(0, gameState.score - 25);
+
+                AudioEngine.playError();
+                spawnParticles(portal.screenX, portal.screenY, '#fb7185', 28, 1.0);
+
+                // Bina contoh ejaan salah yang murid cuba buat
+                const wrongAttempt = portal.prefix.replace('-', '') + word.base;
+                showFeedback(false, `Kurang tepat! Bukan "${wrongAttempt}", sepatutnya "${word.result}"`);
+            }
+
+            updateHUD();
+            nextWord();
+        }
+
+        let feedbackTimeout = null;
+        function showFeedback(isSuccess, text) {
+            const toast = document.getElementById('feedback-toast');
+            const box = document.getElementById('feedback-box');
+            const icon = document.getElementById('feedback-icon');
+            const msg = document.getElementById('feedback-msg');
+
+            clearTimeout(feedbackTimeout);
+
+            if (isSuccess) {
+                box.className = "px-5 py-2.5 sm:px-6 sm:py-3 rounded-2xl font-display text-base sm:text-xl font-bold shadow-2xl border-2 flex items-center gap-2.5 bg-emerald-950/95 border-emerald-400 text-emerald-200";
+                icon.className = "fa-solid fa-circle-check text-emerald-400 text-xl sm:text-2xl";
+            } else {
+                box.className = "px-5 py-2.5 sm:px-6 sm:py-3 rounded-2xl font-display text-sm sm:text-lg font-bold shadow-2xl border-2 flex items-center gap-2.5 bg-rose-950/95 border-rose-400 text-rose-200 max-w-[90vw] text-center";
+                icon.className = "fa-solid fa-circle-xmark text-rose-400 text-xl sm:text-2xl shrink-0";
+            }
+
+            msg.textContent = text;
+            toast.classList.remove('opacity-0', 'scale-90');
+            toast.classList.add('opacity-100', 'scale-100');
+
+            feedbackTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'scale-100');
+                toast.classList.add('opacity-0', 'scale-90');
+            }, isSuccess ? 1400 : 2400);
+        }
+
+        function updateHUD() {
+            document.getElementById('score-display').textContent = gameState.score;
+
+            const comboBadge = document.getElementById('combo-badge');
+            const comboText = document.getElementById('combo-text');
+            if (gameState.combo >= 2) {
+                comboBadge.classList.remove('hidden');
+                comboBadge.classList.add('flex');
+                comboText.textContent = `KOMBO x${gameState.combo}`;
+                comboBadge.classList.add('scale-110');
+                setTimeout(() => comboBadge.classList.remove('scale-110'), 180);
+            } else {
+                comboBadge.classList.add('hidden');
+                comboBadge.classList.remove('flex');
+            }
+        }
+
+        function nextWord() {
+            if (gameState.wordPool.length === 0) {
+                // Kocok semula bank perkataan jika habis
+                gameState.wordPool = [...WORD_BANK].sort(() => Math.random() - 0.5);
+            }
+            gameState.currentWord = gameState.wordPool.pop();
+
+            document.getElementById('word-emoji').textContent = gameState.currentWord.emoji;
+            document.getElementById('word-text').textContent = gameState.currentWord.base;
+            
+            // Pembayang mesra murid berdasarkan huruf pertama
+            const firstChar = gameState.currentWord.base.charAt(0).toUpperCase();
+            const sylCount = countSyllables(gameState.currentWord.base);
+            document.getElementById('word-clue').textContent = sylCount === 1 
+                ? "1 Suku Kata" 
+                : `Huruf Awal: '${firstChar}'`;
+
+            centerWordCard();
+
+            // Animasi kemunculan kad baharu
+            cardInnerEl.classList.add('scale-90');
+            setTimeout(() => cardInnerEl.classList.remove('scale-90'), 120);
+        }
+
+        function countSyllables(word) {
+            const vowels = word.match(/[aeiou]/gi);
+            return vowels ? vowels.length : 1;
+        }
+
+        /**
+         * ============================================================================
+         * KAWALAN TETIKUS & SENTUHAN (SANDARAN / ALTERNATIF KEPADA KAMERA)
+         * ============================================================================
+         */
+        wordCardEl.addEventListener('pointerdown', (e) => {
+            if (!gameState.isPlaying) return;
+            e.preventDefault();
+            AudioEngine.init();
+            AudioEngine.playPinch();
+            gameState.isDragging = true;
+            gameState.dragSource = 'pointer';
+            wordCardEl.classList.remove('card-idle');
+            cardInnerEl.classList.add('scale-110');
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!gameState.isPlaying || !gameState.isDragging || gameState.dragSource !== 'pointer') return;
+            const zoneRect = playZoneEl.getBoundingClientRect();
+            const relX = e.clientX - zoneRect.left;
+            const relY = e.clientY - zoneRect.top;
+            processCardMovement(relX, relY);
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (gameState.isDragging && gameState.dragSource === 'pointer') {
+                releaseCard();
+            }
+        });
+
+        /**
+         * ============================================================================
+         * INTEGRASI GOOGLE MEDIAPIPE HANDS (PENJEJAKAN ISYARAT MENCUBIT / PINCH)
+         * ============================================================================
+         */
+        let mediaPipeInitialized = false;
+
+        async function initMediaPipeHands() {
+            if (mediaPipeInitialized) return;
+            mediaPipeInitialized = true;
+
+            const statusDot = document.getElementById('cam-status-dot');
+            const statusText = document.getElementById('cam-status-text');
+
+            try {
+                const hands = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.65,
+                    minTrackingConfidence: 0.6
+                });
+
+                hands.onResults(onHandResults);
+
+                const camera = new Camera(videoEl, {
+                    onFrame: async () => {
+                        await hands.send({ image: videoEl });
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                await camera.start();
+                statusDot.className = "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]";
+                statusText.textContent = "Kamera Tangan Aktif";
+            } catch (err) {
+                console.warn("Kamera tidak dapat diakses atau ditolak:", err);
+                statusDot.className = "w-2 h-2 rounded-full bg-cyan-400";
+                statusText.textContent = "Mod Tetikus / Sentuhan";
+            }
+        }
+
+        function onHandResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                handState.detected = true;
+                handState.landmarks = landmarks;
+
+                // Titik 4 = Hujung Ibu Jari (Thumb Tip)
+                // Titik 8 = Hujung Jari Telunjuk (Index Finger Tip)
+                const thumb = landmarks[4];
+                const index = landmarks[8];
+
+                // Kira titik tengah antara ibu jari & jari telunjuk
+                // Nota: Koordinat X dicerminkan (1 - x) supaya selari dengan paparan webcam cermin
+                const midX = (1 - (thumb.x + index.x) / 2) * window.innerWidth;
+                const midY = ((thumb.y + index.y) / 2) * window.innerHeight;
+
+                // Pelicinan pergerakan (Linear Interpolation) supaya penunjuk stabil
+                handState.smoothX += (midX - handState.smoothX) * 0.45;
+                handState.smoothY += (midY - handState.smoothY) * 0.45;
+
+                // Kira jarak Euclidian ternormal antara hujung ibu jari & jari telunjuk
+                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+                
+                // Ambang isyarat mencubit (Hysteresis untuk mengelakkan kelipan)
+                const pinchThresholdStart = 0.058;
+                const pinchThresholdRelease = 0.082;
+
+                handState.pinchStrength = Math.max(0, Math.min(1, 1 - (pinchDist / 0.14)));
+
+                if (!handState.isPinching && pinchDist < pinchThresholdStart) {
+                    handState.isPinching = true;
+                    onHandPinchStart();
+                } else if (handState.isPinching && pinchDist > pinchThresholdRelease) {
+                    handState.isPinching = false;
+                    onHandPinchEnd();
+                }
+
+                // Jika sedang mencubit dan memegang kad, gerakkan kad mengikut tangan
+                if (gameState.isPlaying && gameState.isDragging && gameState.dragSource === 'hand') {
+                    const zoneRect = playZoneEl.getBoundingClientRect();
+                    const relX = handState.smoothX - zoneRect.left;
+                    const relY = handState.smoothY - zoneRect.top;
+                    processCardMovement(relX, relY);
+
+                    // Jejak zarah halus semasa menyeret dengan tangan
+                    if (Math.random() > 0.45) {
+                        spawnParticles(handState.smoothX, handState.smoothY, '#38bdf8', 2, 0.4);
+                    }
+                }
+            } else {
+                handState.detected = false;
+                if (handState.isPinching) {
+                    handState.isPinching = false;
+                    onHandPinchEnd();
+                }
+            }
+        }
+
+        function onHandPinchStart() {
+            // Kesan visual percikan kecil apabila mencubit
+            spawnParticles(handState.smoothX, handState.smoothY, '#fbbf24', 10, 0.6);
+
+            if (!gameState.isPlaying) return;
+
+            // Semak sama ada penunjuk tangan berada di atas atau berhampiran kad perkataan
+            const cardRect = wordCardEl.getBoundingClientRect();
+            const padding = 45; // Zon toleransi supaya mudah dicubit oleh murid
+            const isOverCard = (
+                handState.smoothX >= cardRect.left - padding &&
+                handState.smoothX <= cardRect.right + padding &&
+                handState.smoothY >= cardRect.top - padding &&
+                handState.smoothY <= cardRect.bottom + padding
+            );
+
+            if (isOverCard && !gameState.isDragging) {
+                AudioEngine.init();
+                AudioEngine.playPinch();
+                gameState.isDragging = true;
+                gameState.dragSource = 'hand';
+                wordCardEl.classList.remove('card-idle');
+                cardInnerEl.classList.add('scale-110');
+            }
+        }
+
+        function onHandPinchEnd() {
+            if (gameState.isDragging && gameState.dragSource === 'hand') {
+                releaseCard();
+            }
+        }
+
+        /**
+         * ============================================================================
+         * GELUNG ANIMASI UTAMA KANVAS (PENUNJUK TANGAN, GARIS MAGNET & ZARAH)
+         * ============================================================================
+         */
+        function renderLoop() {
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+            // 1. Lukis Garis Medan Magnetik jika kad sedang ditarik ke portal yang betul
+            if (gameState.isPlaying && gameState.isDragging && gameState.magnetTarget) {
+                const portals = getPortalCenters();
+                const targetP = portals.find(p => p.prefix === gameState.magnetTarget);
+                const cardRect = wordCardEl.getBoundingClientRect();
+                const cardCenterX = cardRect.left + cardRect.width / 2;
+                const cardCenterY = cardRect.top + cardRect.height / 2;
+
+                if (targetP) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(cardCenterX, cardCenterY);
+                    ctx.lineTo(targetP.screenX, targetP.screenY);
+                    ctx.strokeStyle = 'rgba(52, 211, 153, 0.75)';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([10, 8]);
+                    ctx.lineDashOffset = -performance.now() * 0.05;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // 2. Lukis Penunjuk Tangan Interaktif & Rangka Jari Ringkas
+            if (handState.detected) {
+                const hx = handState.smoothX;
+                const hy = handState.smoothY;
+
+                // Lukis garisan antara ibu jari & jari telunjuk
+                if (handState.landmarks) {
+                    const thumb = handState.landmarks[4];
+                    const index = handState.landmarks[8];
+                    const tx = (1 - thumb.x) * canvasEl.width;
+                    const ty = thumb.y * canvasEl.height;
+                    const ix = (1 - index.x) * canvasEl.width;
+                    const iy = index.y * canvasEl.height;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(tx, ty);
+                    ctx.lineTo(ix, iy);
+                    ctx.strokeStyle = handState.isPinching ? '#fbbf24' : 'rgba(56, 189, 248, 0.7)';
+                    ctx.lineWidth = handState.isPinching ? 5 : 3;
+                    ctx.stroke();
+
+                    // Titik pada hujung kedua-dua jari
+                    [ {x: tx, y: ty}, {x: ix, y: iy} ].forEach(pt => {
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+                        ctx.fillStyle = handState.isPinching ? '#fbbf24' : '#38bdf8';
+                        ctx.fill();
+                    });
+                    ctx.restore();
+                }
+
+                // Lingkaran Penunjuk Utama (Kursor Tangan)
+                ctx.save();
+                const outerRadius = handState.isPinching ? 20 : 30 - (handState.pinchStrength * 10);
+                
+                // Cahaya Luar
+                const grad = ctx.createRadialGradient(hx, hy, 2, hx, hy, outerRadius * 1.6);
+                if (handState.isPinching) {
+                    grad.addColorStop(0, 'rgba(251, 191, 36, 0.95)');
+                    grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+                    grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+                } else {
+                    grad.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+                    grad.addColorStop(0.5, 'rgba(14, 165, 233, 0.35)');
+                    grad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+                }
+
+                ctx.beginPath();
+                ctx.arc(hx, hy, outerRadius * 1.6, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // Cincin Penunjuk
+                ctx.beginPath();
+                ctx.arc(hx, hy, outerRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = handState.isPinching ? '#fef08a' : '#bae6fd';
+                ctx.lineWidth = handState.isPinching ? 4 : 2.5;
+                ctx.stroke();
+
+                // Teras Tengah
+                ctx.beginPath();
+                ctx.arc(hx, hy, handState.isPinching ? 7 : 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 3. Kemas Kini & Lukis Semua Zarah Magis
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.96;
+                p.vy *= 0.96;
+                p.alpha -= p.decay;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                if (p.shape === 'star') {
+                    drawStar(p.x, p.y, 5, p.size, p.size * 0.45, p.color, p.alpha);
+                } else {
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * 0.7, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        /**
+         * ============================================================================
+         * PENGURUSAN ALIRAN PERMAINAN (MULA, PEMASA 90 SAAT, TAMAT & ANALISIS)
+         * ============================================================================
+         */
+        function startGame() {
+            AudioEngine.init();
+            initMediaPipeHands();
+
+            // Tetapkan semula pemboleh ubah permainan
+            gameState.isPlaying = true;
+            gameState.score = 0;
+            gameState.combo = 0;
+            gameState.maxCombo = 0;
+            gameState.correctCount = 0;
+            gameState.timeLeft = 90;
+            gameState.history = [];
+            gameState.isDragging = false;
+            gameState.dragSource = null;
+            gameState.wordPool = [...WORD_BANK].sort(() => Math.random() - 0.5);
+
+            // Papar UI Permainan & Sembunyikan Menu
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('hud-bar').classList.remove('hidden');
+            document.getElementById('play-zone').classList.remove('hidden');
+            document.getElementById('footer-bar').classList.remove('hidden');
+
+            updateHUD();
+            updateTimerDisplay();
+            nextWord();
+
+            // Mulakan Pemasa Undur 90 Saat
+            clearInterval(gameState.timerInterval);
+            gameState.timerInterval = setInterval(() => {
+                gameState.timeLeft--;
+                updateTimerDisplay();
+
+                if (gameState.timeLeft <= 10 && gameState.timeLeft > 0) {
+                    AudioEngine.playTone(880, 'sine', 0.08, 0.1);
+                }
+
+                if (gameState.timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(gameState.timeLeft / 60);
+            const secs = gameState.timeLeft % 60;
+            const timerEl = document.getElementById('timer-display');
+            timerEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            if (gameState.timeLeft <= 15) {
+                timerEl.classList.remove('text-white');
+                timerEl.classList.add('text-rose-400', 'animate-pulse');
+            } else {
+                timerEl.classList.add('text-white');
+                timerEl.classList.remove('text-rose-400', 'animate-pulse');
+            }
+        }
+
+        function endGame() {
+            gameState.isPlaying = false;
+            gameState.isDragging = false;
+            clearInterval(gameState.timerInterval);
+            AudioEngine.playGameOver();
+
+            // Sembunyikan zon permainan & papar skrin keputusan
+            document.getElementById('hud-bar').classList.add('hidden');
+            document.getElementById('play-zone').classList.add('hidden');
+            document.getElementById('footer-bar').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+
+            // Kemas kini statistik akhir
+            document.getElementById('final-score').textContent = gameState.score;
+            document.getElementById('final-correct').textContent = gameState.correctCount;
+            document.getElementById('final-combo').textContent = `${gameState.maxCombo}x`;
+
+            renderAnalysis();
+        }
+
+        function renderAnalysis() {
+            const listEl = document.getElementById('analysis-list');
+            const badgeEl = document.getElementById('mistake-count-badge');
+            listEl.innerHTML = '';
+
+            const mistakes = gameState.history.filter(item => !item.isCorrect);
+            const corrects = gameState.history.filter(item => item.isCorrect);
+
+            badgeEl.textContent = `${mistakes.length} Kesalahan • ${corrects.length} Tepat`;
+            if (mistakes.length === 0 && gameState.history.length > 0) {
+                badgeEl.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            } else {
+                badgeEl.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30";
+            }
+
+            if (gameState.history.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-sm">
+                        Tiada rekod percubaan direkodkan. Cuba seret sekurang-kurangnya satu kad perkataan!
+                    </div>
+                `;
+                return;
+            }
+
+            // Paparkan kesalahan dahulu supaya murid dapat belajar daripada kesilapan ejaan
+            const sortedHistory = [...mistakes, ...corrects];
+
+            sortedHistory.forEach(item => {
+                const row = document.createElement('div');
+                if (!item.isCorrect) {
+                    const wrongWord = item.selectedPrefix.replace('-', '') + item.base;
+                    row.className = "bg-rose-950/45 border border-rose-500/40 rounded-xl p-3 sm:p-3.5";
+                    row.innerHTML = `
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </span>
+                                <span class="font-bold text-white text-sm sm:text-base">Kata Dasar: <span class="text-cyan-300">${item.base}</span></span>
+                            </div>
+                            <div class="text-xs sm:text-sm">
+                                <span class="line-through text-rose-400 mr-2">${item.selectedPrefix} (${wrongWord})</span>
+                                <span class="font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-lg border border-emerald-500/30">
+                                    &rarr; ${item.correctResult}
+                                </span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-300 pl-8">
+                            <i class="fa-solid fa-circle-info text-amber-400 mr-1"></i> ${item.rule}
+                        </p>
+                    `;
+                } else {
+                    row.className = "bg-emerald-950/30 border border-emerald-500/25 rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-2";
+                    row.innerHTML = `
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-check"></i>
+                            </span>
+                            <span class="text-sm text-slate-200">
+                                <strong>${item.correctPrefix}</strong> + ${item.base} = <strong class="text-emerald-300">${item.correctResult}</strong>
+                            </span>
+                        </div>
+                        <span class="text-[11px] text-emerald-400/80 font-semibold hidden sm:inline">Tepat</span>
+                    `;
+                }
+                listEl.appendChild(row);
+            });
+        }
+
+        function resetAndStart() {
+            startGame();
+        }
+
+        // Mulakan saiz kanvas dan gelung animasi apabila tetingkap dimuatkan
+        window.onload = function () {
+            resizeCanvas();
+            renderLoop();
+        };
+    </script>
+</body>
+</html>
